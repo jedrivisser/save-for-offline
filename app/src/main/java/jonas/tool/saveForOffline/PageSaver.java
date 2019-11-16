@@ -67,10 +67,6 @@
 
 package jonas.tool.saveForOffline;
 
-import com.squareup.okhttp.Cache;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.Response;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -94,11 +90,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import okhttp3.Cache;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
 
 public class PageSaver {
     private EventCallback eventCallback;
 
-    private OkHttpClient client = new OkHttpClient();
+    private final OkHttpClient client;
     private final String HTTP_REQUEST_TAG = "TAG";
 
     private boolean isCancelled = false;
@@ -129,17 +130,17 @@ public class PageSaver {
     public PageSaver(EventCallback callback) {
         this.eventCallback = callback;
 
-        client.setConnectTimeout(20, TimeUnit.SECONDS);
-        client.setReadTimeout(20, TimeUnit.SECONDS);
-        client.setWriteTimeout(20, TimeUnit.SECONDS);
-
-        client.setFollowRedirects(true);
-        client.setFollowSslRedirects(true);
+        client = new OkHttpClient.Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .writeTimeout(20, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build();
     }
 
     public void cancel() {
         this.isCancelled = true;
-        client.cancel(HTTP_REQUEST_TAG);
     }
 
     public void resetState() {
@@ -411,6 +412,12 @@ public class PageSaver {
         }
 
         if (getOptions().saveOther()) {
+            Elements bases = document.select("base[href]");
+            eventCallback.onLogMessage("Got " + bases.size() + " base elements with a href attribute");
+            for (Element base : bases) {
+                base.remove();
+            }
+
             // Get all the links
             links = document.select("link[href]");
             eventCallback.onLogMessage("Got " + links.size() + " link elements with a href attribute");
@@ -590,11 +597,7 @@ public class PageSaver {
     private boolean isLinkValid(String url) {
         if (url == null || url.length() == 0) {
             return false;
-        } else if (!url.startsWith("http")) {
-            return false;
-        } else {
-            return true;
-        }
+        } else return url.startsWith("http");
     }
 
     private void addLinkToList(String link, List<String> list) {
@@ -632,14 +635,21 @@ public class PageSaver {
         }
 
         if (filename.contains("?")) {
-            filename = filename.substring(
-                    0,
-                    filename.indexOf("?")) + filename.substring(filename.indexOf("?") + 1).hashCode();
+            String baseFilename = filename.substring(0, filename.indexOf("?"));
+            String extension = "";
+            int paramsHash = filename.substring(filename.indexOf("?") + 1).hashCode();
+            if (baseFilename.contains(".")) {
+                extension = baseFilename.substring(baseFilename.lastIndexOf("."));
+                baseFilename = baseFilename.substring(0, baseFilename.lastIndexOf("."));
+            } else {
+                extension = "." + baseFilename;
+                baseFilename = "";
+            }
+            filename = baseFilename + paramsHash + extension;
         }
 
         filename = fileNameReplacementPattern.matcher(filename).replaceAll("_");
         filename = filename.substring(0, Math.min(200, filename.length()));
-        ;
 
         return filename;
     }
@@ -685,15 +695,6 @@ public class PageSaver {
         private boolean saveVideo = false;
 
         private String userAgent = " ";
-
-        public void setCache(File cacheDirectory, long maxCacheSize) {
-            Cache cache = (new Cache(cacheDirectory, maxCacheSize));
-            client.setCache(cache);
-        }
-
-        public void clearCache() throws IOException {
-            client.getCache().evictAll();
-        }
 
         public String getUserAgent() {
             return userAgent;
@@ -754,18 +755,18 @@ public class PageSaver {
 }
 
 interface EventCallback {
-    public void onProgressChanged(int progress, int maxProgress, boolean indeterminate);
+    void onProgressChanged(int progress, int maxProgress, boolean indeterminate);
 
-    public void onProgressMessage(String fileName);
+    void onProgressMessage(String fileName);
 
-    public void onPageTitleAvailable(String pageTitle);
+    void onPageTitleAvailable(String pageTitle);
 
-    public void onLogMessage(String message);
+    void onLogMessage(String message);
 
-    public void onError(Throwable error);
+    void onError(Throwable error);
 
-    public void onError(String errorMessage);
+    void onError(String errorMessage);
 
-    public void onFatalError(Throwable error, String pageUrl);
+    void onFatalError(Throwable error, String pageUrl);
 }
 

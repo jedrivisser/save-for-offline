@@ -190,6 +190,7 @@ public class SaveService extends Service {
                         pageSaver.getPageTitle(),
                         newSavedPageDirectory.getPath());
             } catch (Exception e) {  //so that exceptions don't fpget swallowed and we see them.
+                Log.e("test", e.getMessage());
                 Toast.makeText(
                         SaveService.this,
                         "SaveService Exception: " + e.getMessage(),

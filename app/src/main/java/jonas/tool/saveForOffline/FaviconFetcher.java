@@ -52,8 +52,6 @@ package jonas.tool.saveForOffline;
 
 import android.graphics.BitmapFactory;
 
-import com.squareup.okhttp.*;
-
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
@@ -63,7 +61,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
-public class FaviconFetcher {
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
+class FaviconFetcher {
     private static FaviconFetcher INSTANCE = new FaviconFetcher();
     private OkHttpClient client = new OkHttpClient();
 
@@ -87,16 +90,16 @@ public class FaviconFetcher {
     private FaviconFetcher() {
     }
 
-    public static FaviconFetcher getInstance() {
+    static FaviconFetcher getInstance() {
         return INSTANCE;
     }
 
-    public String getFaviconUrl(Document document) {
+    String getFaviconUrl(Document document) {
         List<String> potentialIcons = getPotentialFaviconUrls(document);
         return pickBestIconUrl(potentialIcons);
     }
 
-    public List<String> getPotentialFaviconUrls(Document document) {
+    private List<String> getPotentialFaviconUrls(Document document) {
         List<String> iconUrls = new ArrayList<String>();
         HttpUrl base = HttpUrl.parse(document.baseUri());
 
@@ -135,7 +138,7 @@ public class FaviconFetcher {
     }
 
 
-    public String pickBestIconUrl(List<String> urls) {
+    private String pickBestIconUrl(List<String> urls) {
         String bestIconUrl = null;
         int currentBestWidth = 0;
 

@@ -64,6 +64,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.ActionMode;
 import android.view.Gravity;
 import android.view.Menu;
@@ -158,7 +159,37 @@ public class MainActivity extends Activity implements SearchView.OnQueryTextList
 
         mainGrid.setAdapter(gridAdapter);
 
+        new Thread(() -> {
+            String pageUrl = "http://leaders.247.org.za/2019/10/21/first-lesson/";
 
+            SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+            String destinationDirectory = DirectoryHelper.getDestinationDirectory(sharedPreferences);
+            PageSaver pageSaver = new PageSaver(new PageSaveEventCallback());
+            pageSaver.getOptions().setUserAgent(sharedPreferences.getString(
+                    "user_agent",
+                    getResources().getStringArray(R.array.entries_list_preference)[1]));
+            boolean success = pageSaver.getPage(pageUrl, destinationDirectory, "index.html");
+            Log.d("test", "success: " + success);
+            File oldSavedPageDirectory = new File(destinationDirectory);
+            File newSavedPageDirectory = new File(getNewDirectoryPath(
+                    pageSaver.getPageTitle(),
+                    oldSavedPageDirectory.getPath()));
+            oldSavedPageDirectory.renameTo(newSavedPageDirectory);
+
+            new Database(this).addToDatabase(
+                    newSavedPageDirectory.getPath() + File.separator,
+                    pageSaver.getPageTitle(),
+                    pageUrl);
+        }).start();
+    }
+
+    private String getNewDirectoryPath(String title, String oldDirectoryPath) {
+        String returnString = title.replaceAll(
+                "[^a-zA-Z0-9-_\\.]",
+                "_") + DirectoryHelper.createUniqueFilename(); //TODO: Fix this to support non A-Z & 0-9 characters
+
+        File f = new File(oldDirectoryPath);
+        return f.getParentFile().getAbsolutePath() + File.separator + returnString + File.separator;
     }
 
     @Override
@@ -634,5 +665,46 @@ public class MainActivity extends Activity implements SearchView.OnQueryTextList
 
     }
 
+    private class PageSaveEventCallback implements EventCallback {
+        private static final String TAG = "PageSaveEventCallback";
 
+        @Override
+        public void onProgressChanged(int progress, int maxProgress, boolean indeterminate) {
+            Log.d(
+                    TAG,
+                    "onProgressChanged() called with: progress = [" + progress + "], maxProgress = [" + maxProgress + "], indeterminate = [" + indeterminate + "]");
+        }
+
+        @Override
+        public void onProgressMessage(String fileName) {
+            Log.d(TAG, "onProgressMessage() called with: fileName = [" + fileName + "]");
+        }
+
+        @Override
+        public void onPageTitleAvailable(String pageTitle) {
+            Log.d(TAG, "onPageTitleAvailable() called with: pageTitle = [" + pageTitle + "]");
+        }
+
+        @Override
+        public void onLogMessage(String message) {
+            Log.d(TAG, "onLogMessage() called with: message = [" + message + "]");
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            Log.d(TAG, "onError() called with: error = [" + error + "]");
+        }
+
+        @Override
+        public void onError(String errorMessage) {
+            Log.d(TAG, "onError() called with: errorMessage = [" + errorMessage + "]");
+        }
+
+        @Override
+        public void onFatalError(Throwable error, String pageUrl) {
+            Log.d(
+                    TAG,
+                    "onFatalError() called with: error = [" + error + "], pageUrl = [" + pageUrl + "]");
+        }
+    }
 }
